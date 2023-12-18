@@ -111,11 +111,8 @@ function createIo() {
      * @returns {string}
      */
     tablefy(columnsArray, title, columnHeaders) {
-      let columnWidths = columnsArray.map((column) =>
-        this.getMaxElementWidth(column)
-      );
-      columnWidths = columnWidths.map((width, index) =>
-        Math.max(width, columnHeaders[index].toString().length)
+      let columnWidths = columnsArray.map((column, index) =>
+        Math.max(this.getMaxElementWidth(column), columnHeaders[index].length)
       );
       let returnString = "";
       returnString += this.generateSeparatorRow("┌", "─", "┐", columnWidths) +
@@ -370,6 +367,18 @@ const RPSGame = {
       return null;
     }
   },
+  playOneRound() {
+    console.clear();
+    this.io.displayMoveHistory(this.moveHistory, this.gameRules);
+    this.io.displayScore(this.score);
+    this.human.choose(this.io, this.gameRules);
+    this.computer.choose(this.moveHistory, this.gameRules);
+    this.logMoves();
+    return this.gameRules.determineWinner(
+      this.human.move,
+      this.computer.move,
+    );
+  },
   play() {
     console.clear();
     this.io.displayWelcomeMessage();
@@ -378,22 +387,8 @@ const RPSGame = {
       this.score.reset();
       this.moveHistory.reset();
       while (!this.determineMatchWinner()) {
-        console.clear();
-        this.io.displayMoveHistory(this.moveHistory, this.gameRules);
-        this.io.displayScore(this.score);
-        this.human.choose(this.io, this.gameRules);
-        this.computer.choose(this.moveHistory, this.gameRules);
-        this.winner = this.gameRules.determineWinner(
-          this.human.move,
-          this.computer.move,
-        );
-        this.logMoves();
-        if (
-          this.gameRules.determineWinner(
-            this.human.move,
-            this.computer.move,
-          ) !== "tie"
-        ) this.incrementScore(this.winner);
+        this.winner = this.playOneRound();
+        if (this.winner !== "tie") this.incrementScore(this.winner);
       }
       console.clear();
       this.io.displayMoveHistory(this.moveHistory, this.gameRules);
