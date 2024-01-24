@@ -1,5 +1,14 @@
 "use strict";
 
+class Config {
+  static TARGET = 21;
+  static DEALER_STAY_LIMIT = 17;
+  static NUMBER_OF_DECKS = 8;
+  static STARTING_PURSE_VALUE = 5;
+  static RICH_VALUE = 10;
+  static BROKE_VALUE = 0;
+}
+
 class Display {
   static readline = require("readline-sync");
   static wrapText(text, maxWidth) {
@@ -59,7 +68,7 @@ class Card {
   static getValues(card) {
     return Card.VALUES[card.getRank()];
   }
-  
+
   #rank;
   #suit;
   #isFaceDown;
@@ -73,25 +82,25 @@ class Card {
   getRank() {
     return this.#rank;
   }
-  
+
   isFaceDown() {
     return this.#isFaceDown;
   }
-  
+
   isFaceUp() {
     return !this.#isFaceDown;
   }
-  
+
   turnFaceUp() {
     this.#isFaceDown = false;
     return this;
   }
-  
+
   turnFaceDown() {
     this.#isFaceDown = true;
     return this;
   }
-  
+
   getDisplayString() {
     return (this.#isFaceDown)
       ? "[    ]"
@@ -100,22 +109,28 @@ class Card {
 }
 
 class Deck {
-  static shuffle(cards) {
+  static shuffle(cards, numOfShuffles = 1) {
     // This method can take either a Deck or Array<Card>, so we need to handle
     // that by check if the argument is a Deck, and if so, reassigning it to the
     // deck's array of Card objects.
     if (cards instanceof Deck) cards = cards.#cards;
-    for (let index = cards.length - 1; index > 0; index -= 1) {
-      let otherIndex = Math.floor(Math.random() * (index + 1));
-      [cards[index], cards[otherIndex]] = [
-        cards[otherIndex],
-        cards[index],
-      ];
+    for (
+      let shuffleCount = 1;
+      shuffleCount <= numOfShuffles;
+      shuffleCount += 1
+    ) {
+      for (let index = cards.length - 1; index > 0; index -= 1) {
+        let otherIndex = Math.floor(Math.random() * (index + 1));
+        [cards[index], cards[otherIndex]] = [
+          cards[otherIndex],
+          cards[index],
+        ];
+      }
     }
   }
-  
+
   #cards;
-  
+
   /**
    * Create a deck.
    * @param {number} numberOfDecks - The number of "sub decks" that make up the
@@ -132,12 +147,11 @@ class Deck {
           cards.push(new Card(rank, Card.SUITS[suitKey]))
         );
       }
-      if (preShuffle) Deck.shuffle(cards); // Shuffling each deck as we add it.
       this.#cards.push(...cards);
     }
     if (preShuffle) {
       // Shuffling the combined deck 7 times to be thorough.
-      Array(7).fill(null).forEach((_) => Deck.shuffle(this.#cards));
+      Deck.shuffle(this.#cards, 7);
     }
   }
 
@@ -146,11 +160,15 @@ class Deck {
     if (!takeFaceDown) returnCard.turnFaceUp();
     return returnCard;
   }
+
+  addCard(card) {
+    this.#cards.push(card);
+  }
 }
 
 class Hand {
   #cards;
-  
+
   constructor() {
     this.#cards = [];
   }
@@ -164,10 +182,14 @@ class Hand {
     return this.#cards.pop();
   }
 
+  getCardCount() {
+    return this.#cards.length;
+  }
+
   getScore() {
     function sumValues(sum, cardArr) {
       if (cardArr.length === 0) {
-        return (sum <= TwentyOneGame.TARGET) ? sum : 0;
+        return (sum <= Config.TARGET) ? sum : 0;
       } else {
         return Math.max(
           ...(Card.getValues(cardArr[0]).map((value) =>
@@ -177,58 +199,89 @@ class Hand {
       }
     }
     return (sumValues(0, this.#cards) === 0)
-      ? TwentyOneGame.TARGET + 1
+      ? Config.TARGET + 1
       : sumValues(0, this.#cards);
   }
-  
+
   revealCards() {
     this.#cards.forEach((card) => card.turnFaceUp());
   }
-  
+
   getDisplayString() {
     return this.#cards.map((card) => card.getDisplayString()).join(" ");
   }
 }
 class Player {
   #hand;
-  
+
   constructor() {
     this.#hand = new Hand();
   }
-  
+
   getHand() {
     return this.#hand;
   }
 }
 
 class HumanPlayer extends Player {
+  #purse;
+
   constructor() {
     super();
+    this.#purse = Config.STARTING_PURSE_VALUE;
   }
 
+  addToPurse(amount = 1) {
+    this.#purse += amount;
+  }
+
+  subtractFromPurse(amount = 1) {
+    this.#purse -= amount;
+  }
+
+  getPurseBalance() {
+    return this.#purse;
+  }
+
+  isBroke() {
+    return this.getPurseBalance() <= Config.BROKE_VALUE;
+  }
+
+  isRich() {
+    return this.getPurseBalance() >= Config.RICH_VALUE;
+  }
   solicitHit() {
     return Display.readline.keyInYNStrict("Do you want to hit?");
   }
 }
 
 class TwentyOneGame {
-  static TARGET = 21;
-  static DEALER_STAY_LIMIT = 17;
-  static NUMBER_OF_DECKS = 8;
-  
   #dealer;
   #user;
   #deck;
-  
+
   constructor() {
     this.#dealer = new Player();
     this.#user = new HumanPlayer();
-    this.#deck = new Deck(TwentyOneGame.NUMBER_OF_DECKS);
+    this.#deck = new Deck(Config.NUMBER_OF_DECKS);
   }
 
   start() {
     console.clear();
     this.displayWelcomeMessage();
+    while (true) {
+      this.playOneRound();
+      if ((this.#user.isBroke() || this.#user.isRich())) break;
+      if (!Display.readline.keyInYNStrict("Keep playing?")) {
+        console.clear();
+        break;
+      }
+      this.resetGame();
+    }
+    this.displayGoodbyeMessage();
+  }
+
+  playOneRound() {
     this.dealCards();
     this.showCards();
     if (this.isDealerHandNaturalBlackjack()) {
@@ -238,19 +291,38 @@ class TwentyOneGame {
       this.dealerTurn();
     }
     this.dealerRevealCards();
+    this.distributeWinnings();
     this.displayResult();
-    this.displayGoodbyeMessage();
+  }
+
+  distributeWinnings() {
+    if (this.determineWinner() === "user") {
+      this.#user.addToPurse(1);
+    } else if (this.determineWinner() === "dealer") {
+      this.#user.subtractFromPurse(1);
+    }
+  }
+
+  resetGame() {
+    console.clear();
+    while (this.#user.getHand().getCardCount() > 0) {
+      this.#deck.addCard(this.#user.getHand().removeCard());
+    }
+    while (this.#dealer.getHand().getCardCount() > 0) {
+      this.#deck.addCard(this.#dealer.getHand().removeCard());
+    }
+    Deck.shuffle(this.#deck, 7);
   }
 
   isDealerHandNaturalBlackjack() {
-    return this.#dealer.getHand().getScore() === TwentyOneGame.TARGET;
+    return this.#dealer.getHand().getScore() === Config.TARGET;
   }
 
   displayNaturalBlackjackMessage() {
     console.log("Dealer has a natural blackjack!");
     Display.readline.keyInPause("Press any key to continue.");
   }
-  
+
   dealerRevealCards() {
     this.#dealer.getHand().revealCards();
   }
@@ -267,7 +339,7 @@ class TwentyOneGame {
   hit(player) {
     player.getHand().addCard(this.#deck.getCard(false));
   }
-  
+
   showCards() {
     console.log(`dealer: ${this.#dealer.getHand().getDisplayString()}`);
     console.log(`user: ${this.#user.getHand().getDisplayString()}`);
@@ -275,7 +347,7 @@ class TwentyOneGame {
   }
 
   playerTurn() {
-    while (this.#user.getHand().getScore() <= TwentyOneGame.TARGET) {
+    while (this.#user.getHand().getScore() <= Config.TARGET) {
       if (this.#user.solicitHit()) {
         this.hit(this.#user);
       } else {
@@ -287,9 +359,9 @@ class TwentyOneGame {
   }
 
   dealerTurn() {
-    if (this.#user.getHand().getScore() > TwentyOneGame.TARGET) return;
+    if (this.#user.getHand().getScore() > Config.TARGET) return;
     while (
-      this.#dealer.getHand().getScore() < TwentyOneGame.DEALER_STAY_LIMIT
+      this.#dealer.getHand().getScore() < Config.DEALER_STAY_LIMIT
     ) {
       this.hit(this.#dealer);
     }
@@ -309,9 +381,9 @@ class TwentyOneGame {
     );
     console.log(Display.wrapText(
       "This is the most basic version of the casino-style game. Closest to " +
-        `${TwentyOneGame.TARGET} without going over wins. Each player plays ` +
+        `${Config.TARGET} without going over wins. Each player plays ` +
         "against the dealer. If the dealer gets a natural blackjack " +
-        `(${TwentyOneGame.TARGET} on the deal) then the game is over ` +
+        `(${Config.TARGET} on the deal) then the game is over ` +
         "immediately and no players have a chance to take any cards. If you " +
         "need more help than that then Google is your friend or you could " +
         "just play a round or two. Have fun!\n",
@@ -322,7 +394,29 @@ class TwentyOneGame {
   }
 
   displayGoodbyeMessage() {
+    console.log(
+      `You finished the game with $${this.#user.getPurseBalance()} in your purse.`,
+    );
+    if (this.#user.getPurseBalance() >= Config.RICH_VALUE) {
+      console.log("Congrats, you're rich!");
+    } else if (this.#user.getPurseBalance() <= Config.BROKE_VALUE) {
+      console.log("Sorry, you're broke.");
+    }
     console.log("Thank you for playing. Goodbye.");
+  }
+
+  determineWinner() {
+    let dealerScore = this.#dealer.getHand().getScore();
+    let userScore = this.#user.getHand().getScore();
+    if (dealerScore > Config.TARGET) dealerScore = 0;
+    if (userScore > Config.TARGET) userScore = 0;
+    if (dealerScore > userScore) {
+      return "dealer";
+    } else if (userScore > dealerScore) {
+      return "user";
+    } else {
+      return "tie";
+    }
   }
 
   displayResult() {
@@ -331,16 +425,19 @@ class TwentyOneGame {
     let resultMessage;
     let dealerScore = this.#dealer.getHand().getScore();
     let userScore = this.#user.getHand().getScore();
-    if (dealerScore > TwentyOneGame.TARGET) dealerScore = 0;
-    if (userScore > TwentyOneGame.TARGET) userScore = 0;
-    if (dealerScore > userScore) {
+    if (dealerScore > Config.TARGET) dealerScore = 0;
+    if (userScore > Config.TARGET) userScore = 0;
+    const winner = this.determineWinner();
+    if (winner === "dealer") {
       resultMessage = "Dealer wins.";
-    } else if (userScore > dealerScore) {
+    } else if (winner === "user") {
       resultMessage = "User wins.";
     } else {
       resultMessage = "It's a tie!";
     }
     console.log(resultMessage);
+    console.log(`User has $${this.#user.getPurseBalance()} in their purse.`);
+    console.log();
   }
 }
 
