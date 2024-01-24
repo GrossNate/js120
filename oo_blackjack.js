@@ -287,6 +287,7 @@ class TwentyOneGame {
   }
 
   dealerTurn() {
+    if (this.#user.getHand().getScore() > TwentyOneGame.TARGET) return;
     while (
       this.#dealer.getHand().getScore() < TwentyOneGame.DEALER_STAY_LIMIT
     ) {
