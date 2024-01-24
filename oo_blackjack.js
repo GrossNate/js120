@@ -37,8 +37,6 @@ class Card {
     Q: [10],
     K: [10],
   };
-  // The following is roughly approximating an enum, which doesn't exist in
-  // JavaScript.
   static RANKS = {
     2: "2",
     3: "3",
@@ -54,7 +52,14 @@ class Card {
     K: "K",
     A: "A",
   };
-
+  /**
+   * @param {Card} card
+   * @returns {number[]}
+   */
+  static getValues(card) {
+    return Card.VALUES[card.getRank()];
+  }
+  
   #rank;
   #suit;
   #isFaceDown;
@@ -64,34 +69,29 @@ class Card {
     this.#suit = suit;
     this.#isFaceDown = isFaceDown;
   }
-  /**
-   * @param {Card} card
-   * @returns {number[]}
-   */
-  static getValues(card) {
-    return Card.VALUES[card.getRank()];
-  }
 
-  /**
-   * @returns {string}
-   */
   getRank() {
     return this.#rank;
   }
+  
   isFaceDown() {
     return this.#isFaceDown;
   }
+  
   isFaceUp() {
     return !this.#isFaceDown;
   }
+  
   turnFaceUp() {
     this.#isFaceDown = false;
     return this;
   }
+  
   turnFaceDown() {
     this.#isFaceDown = true;
     return this;
   }
+  
   getDisplayString() {
     return (this.#isFaceDown)
       ? "[    ]"
@@ -101,8 +101,10 @@ class Card {
 
 class Deck {
   static shuffle(cards) {
+    // This method can take either a Deck or Array<Card>, so we need to handle
+    // that by check if the argument is a Deck, and if so, reassigning it to the
+    // deck's array of Card objects.
     if (cards instanceof Deck) cards = cards.#cards;
-    // need to check if cards are a deck or not
     for (let index = cards.length - 1; index > 0; index -= 1) {
       let otherIndex = Math.floor(Math.random() * (index + 1));
       [cards[index], cards[otherIndex]] = [
@@ -111,7 +113,9 @@ class Deck {
       ];
     }
   }
+  
   #cards;
+  
   /**
    * Create a deck.
    * @param {number} numberOfDecks - The number of "sub decks" that make up the
@@ -132,10 +136,11 @@ class Deck {
       this.#cards.push(...cards);
     }
     if (preShuffle) {
-      // Shuffling the deck 7 times.
+      // Shuffling the combined deck 7 times to be thorough.
       Array(7).fill(null).forEach((_) => Deck.shuffle(this.#cards));
     }
   }
+
   getCard(takeFaceDown = true) {
     const returnCard = this.#cards.pop().turnFaceDown();
     if (!takeFaceDown) returnCard.turnFaceUp();
@@ -145,17 +150,20 @@ class Deck {
 
 class Hand {
   #cards;
+  
   constructor() {
-    /** Array<Card> */
     this.#cards = [];
   }
+
   addCard(card) {
     this.#cards.push(card);
   }
+
   removeCard() {
     if (this.#cards.length < 1) return null;
     return this.#cards.pop();
   }
+
   getScore() {
     function sumValues(sum, cardArr) {
       if (cardArr.length === 0) {
@@ -168,23 +176,26 @@ class Hand {
         );
       }
     }
-
     return (sumValues(0, this.#cards) === 0)
       ? TwentyOneGame.TARGET + 1
       : sumValues(0, this.#cards);
   }
+  
   revealCards() {
     this.#cards.forEach((card) => card.turnFaceUp());
   }
+  
   getDisplayString() {
     return this.#cards.map((card) => card.getDisplayString()).join(" ");
   }
 }
 class Player {
   #hand;
+  
   constructor() {
     this.#hand = new Hand();
   }
+  
   getHand() {
     return this.#hand;
   }
@@ -203,13 +214,16 @@ class HumanPlayer extends Player {
 class TwentyOneGame {
   static TARGET = 21;
   static DEALER_STAY_LIMIT = 17;
+  static NUMBER_OF_DECKS = 8;
+  
   #dealer;
   #user;
   #deck;
+  
   constructor() {
     this.#dealer = new Player();
     this.#user = new HumanPlayer();
-    this.#deck = new Deck(8); // We're playing with a 8 decks combined.
+    this.#deck = new Deck(TwentyOneGame.NUMBER_OF_DECKS);
   }
 
   start() {
@@ -236,6 +250,7 @@ class TwentyOneGame {
     console.log("Dealer has a natural blackjack!");
     Display.readline.keyInPause("Press any key to continue.");
   }
+  
   dealerRevealCards() {
     this.#dealer.getHand().revealCards();
   }
@@ -248,12 +263,12 @@ class TwentyOneGame {
       this.#user.getHand().addCard(this.#deck.getCard(false));
     });
   }
-  /** @param {Player} player */
+
   hit(player) {
     player.getHand().addCard(this.#deck.getCard(false));
   }
+  
   showCards() {
-    //STUB
     console.log(`dealer: ${this.#dealer.getHand().getDisplayString()}`);
     console.log(`user: ${this.#user.getHand().getDisplayString()}`);
     console.log();
