@@ -19,13 +19,13 @@ Array.prototype.joinOr = function (
     return `${this[0].toString()} ${finalJoiner} ${this[1].toString()}`;
   }
   return this.reduce(
-    (returnString, element, index, myArray) =>
+    (returnString, element, index) =>
       returnString + element.toString() +
       ((index <= this.length - 3)
         ? joinCharacter
         : (index === this.length - 2)
-        ? (useOxfordComma ? joinCharacter : " ") + finalJoiner + " "
-        : ""),
+          ? (useOxfordComma ? joinCharacter : " ") + finalJoiner + " "
+          : ""),
     "",
   );
 };
@@ -75,8 +75,14 @@ class Board {
     this.squares[key].setMarker(marker);
   }
   countMarkersFor(player, keys) {
+    let markerInQuestion;
+    if (player instanceof Player) {
+      markerInQuestion = player.getMarker();
+    } else {
+      markerInQuestion = player;
+    }
     let markers = keys.filter((key) =>
-      this.squares[key].getMarker() === player.getMarker()
+      this.squares[key].getMarker() === markerInQuestion
     );
     return markers.length;
   }
@@ -115,7 +121,8 @@ class Human extends Player {
   constructor() {
     super(Square.HUMAN_MARKER);
   }
-  chooseMove(emptySquareIds) {
+  chooseMove(board) {
+    const emptySquareIds = board.getEmptySquareIds();
     let choice;
     while (true) {
       choice = readline.question(
@@ -133,8 +140,32 @@ class Computer extends Player {
   constructor() {
     super(Square.COMPUTER_MARKER);
   }
-  chooseMove(emptySquareIds) {
-    return emptySquareIds[Math.floor(Math.random() * emptySquareIds.length)];
+  #chooseBestSquareFor(playerMark, board) {
+    const emptySquareIds = board.getEmptySquareIds();
+    for (let i = 0; i < emptySquareIds.length; i += 1) {
+      for (let j = 0; j < TttGame.POSSIBLE_WINNING_ROWS.length; j += 1) {
+        if (
+          TttGame.POSSIBLE_WINNING_ROWS[j].includes(emptySquareIds[i]) &&
+          board.countMarkersFor(
+            playerMark,
+            TttGame.POSSIBLE_WINNING_ROWS[j],
+          ) === 2
+        ) return emptySquareIds[i];
+      }
+    }
+    return null;
+  }
+  /**
+   * @param {Board} board
+   */
+  chooseMove(board) {
+    return this.#chooseBestSquareFor(Square.COMPUTER_MARKER, board) ||
+      this.#chooseBestSquareFor(Square.HUMAN_MARKER, board) ||
+      ((board.getEmptySquareIds().includes("5")) ? "5" : null) ||
+      board
+        .getEmptySquareIds()[
+          Math.floor(Math.random() * board.getEmptySquareIds().length)
+        ];
   }
 }
 
@@ -154,6 +185,9 @@ class TttGame {
     this.human = new Human();
     this.computer = new Computer();
   }
+  resetBoard() {
+    this.board = new Board();
+  }
   isWinner(player) {
     return TttGame.POSSIBLE_WINNING_ROWS.some((row) =>
       this.board.countMarkersFor(player, row) === 3
@@ -162,16 +196,12 @@ class TttGame {
   someoneWon() {
     return this.isWinner(this.human) || this.isWinner(this.computer);
   }
-  play() {
-    console.clear();
-    this.displayWelcomeMessage();
-    this.board.display();
-
+  playOneRound() {
     while (true) {
       this
         .board
         .markSquareAt(
-          this.human.chooseMove(this.board.getEmptySquareIds()),
+          this.human.chooseMove(this.board),
           this.human.getMarker(),
         );
       if (this.gameOver()) break;
@@ -179,7 +209,7 @@ class TttGame {
       this
         .board
         .markSquareAt(
-          this.computer.chooseMove(this.board.getEmptySquareIds()),
+          this.computer.chooseMove(this.board, this.human),
           this.computer.getMarker(),
         );
       if (this.gameOver()) break;
@@ -187,6 +217,17 @@ class TttGame {
     }
     this.board.displayWithClear();
     this.displayResults();
+  }
+  play() {
+    console.clear();
+    this.displayWelcomeMessage();
+    this.board.display();
+    while (true) {
+      this.playOneRound();
+      if (!readline.keyInYNStrict("Play again? (y/n)?")) break;
+      this.resetBoard();
+      this.board.displayWithClear();
+    }
     this.displayGoodbyeMessage();
   }
 
