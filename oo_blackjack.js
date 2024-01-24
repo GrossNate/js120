@@ -369,26 +369,20 @@ class TwentyOneGame {
 
   displayWelcomeMessage() {
     console.log(
-      "Let's play . . . \n\n" +
-        " _     _            _    _            _    \n" +
+      " _     _            _    _            _    \n" +
         "| |   | |          | |  (_)          | |   \n" +
         "| |__ | | __ _  ___| | ___  __ _  ___| | __\n" +
         "| '_ \\| |/ _` |/ __| |/ / |/ _` |/ __| |/ /\n" +
         "| |_) | | (_| | (__|   <| | (_| | (__|   < \n" +
         "|_.__/|_|\\__,_|\\___|_|\\_\\ |\\__,_|\\___|_|\\_\\\n" +
         "                       _/ |                \n" +
-        "                      |__/\n\n",
-    );
+        "                      |__/\n\n");
     console.log(Display.wrapText(
-      "This is the most basic version of the casino-style game. Closest to " +
-        `${Config.TARGET} without going over wins. Each player plays ` +
-        "against the dealer. If the dealer gets a natural blackjack " +
-        `(${Config.TARGET} on the deal) then the game is over ` +
-        "immediately and no players have a chance to take any cards. If you " +
-        "need more help than that then Google is your friend or you could " +
-        "just play a round or two. Have fun!\n",
-      80,
-    ));
+      `Closest to ${Config.TARGET} without going over wins. If dealer gets a ` +
+        `natural blackjack (${Config.TARGET} on the deal) then the game is ` +
+        "over immediately. If you need more help then you can Google the " +
+        "rules or play a few rounds and you'll get the hang of it. Have fun!\n",
+      80));
     Display.readline.keyInPause("Press any key to play!");
     console.clear();
   }
